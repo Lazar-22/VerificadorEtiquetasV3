@@ -8,105 +8,76 @@ from dotenv import load_dotenv
 import gspread
 from google.oauth2.service_account import Credentials
 
-# Carga variables de .env SOLO si el archivo existe (para desarrollo local)
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-secret-key")
 
-# --- Configuración de Odoo ---
 URL = os.getenv("ODOO_URL")
 DB = os.getenv("ODOO_DB")
 USER = os.getenv("ODOO_USER")
 PASS = os.getenv("ODOO_PASS")
 
-# --- Carga de Usuarios ---
 def cargar_usuarios():
     users_str = os.getenv("APP_USERS", "")
-    
-    # ***** LÍNEA DE DEPURACIÓN CLAVE *****
-    # Esto aparecerá en los logs de Render para que veamos qué está leyendo.
-    print(f"DEBUG: Variable APP_USERS leída del entorno: '{users_str}'")
-    # ***********************************
-
     if not users_str:
-        print("ADVERTENCIA: La variable de entorno APP_USERS está vacía o no definida.")
         return {}
-    
     user_dict = {}
     for user_pair in users_str.split(','):
         if ':' in user_pair:
             nombre, pin = user_pair.split(':', 1)
-            user_dict[nombre.strip()] = pin.strip() # Usamos .strip() para limpiar espacios
-    
-    print(f"DEBUG: Usuarios cargados exitosamente: {list(user_dict.keys())}")
+            user_dict[nombre.strip()] = pin.strip()
     return user_dict
 
 USUARIOS_PERMITIDOS = cargar_usuarios()
 
-# ... (El resto de tu código: guardar_en_google_sheets, rutas, etc. se mantiene igual que en la versión anterior) ...
-
-# (Pega aquí el resto de las funciones: guardar_en_google_sheets, login, menu, falabella, logout, verify)
-# Es importante que el resto del código no cambie para no introducir nuevos problemas.
-# A continuación pego el resto del código para que sea solo copiar y pegar.
-
 def guardar_en_google_sheets(datos_verificacion):
-    """Guarda los datos en Google Sheets de forma segura."""
     try:
-        SCOPES = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive.file",
-        ]
+        SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"]
         creds = None
         google_creds_json_str = os.getenv('GOOGLE_CREDENTIALS_JSON')
-
         if google_creds_json_str:
-            creds_dict = json.loads(google_creds_json_str)
-            creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+            creds = Credentials.from_service_account_info(json.loads(google_creds_json_str), scopes=SCOPES)
         else:
-            CREDS_FILE = 'credentials.json'
-            if os.path.exists(CREDS_FILE):
-                creds = Credentials.from_service_account_file(CREDS_FILE, scopes=SCOPES)
+            if os.path.exists('credentials.json'):
+                creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
             else:
                 print("❌ Error: Credenciales de Google no encontradas.")
                 return
-
         gc = gspread.authorize(creds)
         spreadsheet = gc.open("Prueba API")
         sheet = spreadsheet.sheet1
-        
         fila = [
-            datos_verificacion.get('operario', ''),
-            datos_verificacion.get('timestamp', ''),
-            datos_verificacion.get('order_name', ''),
-            datos_verificacion.get('client_ref', ''),
-            datos_verificacion.get('status', ''),
-            datos_verificacion.get('message', ''),
+            datos_verificacion.get('operario', ''), datos_verificacion.get('timestamp', ''),
+            datos_verificacion.get('order_name', ''), datos_verificacion.get('client_ref', ''),
+            datos_verificacion.get('status', ''), datos_verificacion.get('message', ''),
             str(datos_verificacion.get('batch', ''))
         ]
         sheet.append_row(fila)
-        print("✅ Datos guardados correctamente en Google Sheets.")
-
     except Exception as e:
         print(f"❌ Error guardando en Google Sheets: {type(e).__name__}({e})")
 
+# --- MODIFICACIÓN PARA PASAR LA LISTA DE USUARIOS ---
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'user' in session:
         return redirect(url_for('menu'))
 
+    # Obtenemos la lista de nombres de usuario para pasarla a la plantilla
+    user_list = list(USUARIOS_PERMITIDOS.keys())
+
     if request.method == 'POST':
         user = request.form.get('user')
         pin = request.form.get('pin')
-        # Comparamos usando .strip() para evitar problemas con espacios extra
         if user in USUARIOS_PERMITIDOS and USUARIOS_PERMITIDOS[user] == pin:
             session['user'] = user
             return redirect(url_for('menu'))
         else:
-            # Mensaje de error más detallado para depuración
-            print(f"Fallo de login para usuario: '{user}'. Usuarios permitidos: {list(USUARIOS_PERMITIDOS.keys())}")
-            return render_template('login.html', error="Usuario o PIN incorrecto")
-    return render_template('login.html')
+            # Si el login falla, volvemos a enviar la lista de usuarios y el error
+            return render_template('login.html', error="PIN incorrecto o usuario no seleccionado", users=user_list)
+    
+    # Para la primera carga (GET), enviamos la lista de usuarios
+    return render_template('login.html', users=user_list)
 
 @app.route('/menu')
 def menu():
@@ -128,59 +99,42 @@ def logout():
 @app.route('/verify', methods=['POST'])
 def verify():
     if 'user' not in session:
-        return jsonify({'status': 'error', 'message': 'Sesión expirada. Por favor, inicie sesión de nuevo.'}), 401
-
+        return jsonify({'status': 'error', 'message': 'Sesión expirada.'}), 401
     data = request.get_json()
     order_name = data.get('name')
     client_ref = data.get('client_ref')
-    
     santiago_tz = pytz.timezone("America/Santiago")
-    timestamp_santiago = datetime.now(santiago_tz)
-    timestamp_str = timestamp_santiago.strftime('%Y-%m-%d %H:%M:%S')
-
+    timestamp_str = datetime.now(santiago_tz).strftime('%Y-%m-%d %H:%M:%S')
     datos_para_guardar = {
-        'operario': session.get('user', 'Desconocido'),
-        'timestamp': timestamp_str,
-        'order_name': order_name,
-        'client_ref': client_ref
+        'operario': session.get('user', 'Desconocido'), 'timestamp': timestamp_str,
+        'order_name': order_name, 'client_ref': client_ref
     }
-
     try:
         common = xmlrpc.client.ServerProxy(f'{URL}/xmlrpc/2/common')
         uid = common.authenticate(DB, USER, PASS, {})
         models = xmlrpc.client.ServerProxy(f'{URL}/xmlrpc/2/object')
-
         picking_ids = models.execute_kw(DB, uid, PASS, 'stock.picking', 'search', [[('name', '=', order_name)]])
-
         if not picking_ids:
             datos_para_guardar.update({'status': 'error', 'message': 'La orden de venta no existe.'})
             guardar_en_google_sheets(datos_para_guardar)
             return jsonify({'status': 'error', 'message': 'La orden de venta no existe.'})
-
-        picking_id = picking_ids[0]
-        picking_info = models.execute_kw(DB, uid, PASS, 'stock.picking', 'read', [picking_id], {'fields': ['client_order_ref', 'batch_id']})[0]
-
+        picking_info = models.execute_kw(DB, uid, PASS, 'stock.picking', 'read', [picking_ids[0]], {'fields': ['client_order_ref', 'batch_id']})[0]
         if picking_info.get('client_order_ref') == client_ref:
-            batch_name = "Sin Batch"
-            total_in_batch = 0
+            batch_name, total_in_batch = "Sin Batch", 0
             if picking_info.get('batch_id'):
-                batch_id = picking_info['batch_id'][0]
-                batch_info = models.execute_kw(DB, uid, PASS, 'stock.picking.batch', 'read', [batch_id], {'fields': ['name', 'picking_ids']})[0]
+                batch_info = models.execute_kw(DB, uid, PASS, 'stock.picking.batch', 'read', [picking_info['batch_id'][0]], {'fields': ['name', 'picking_ids']})[0]
                 batch_name = batch_info.get('name', 'Sin Batch')
                 total_in_batch = len(batch_info.get('picking_ids', []))
-
             result = {'status': 'success', 'message': '¡Válido!', 'batch': batch_name, 'total': total_in_batch}
             datos_para_guardar.update({'status': 'success', 'message': '¡Válido!', 'batch': batch_name})
         else:
             result = {'status': 'error', 'message': 'La Referencia del Cliente no coincide.'}
             datos_para_guardar.update({'status': 'error', 'message': 'La Referencia del Cliente no coincide.'})
-
         guardar_en_google_sheets(datos_para_guardar)
         return jsonify(result)
-
     except Exception as e:
         print(f"❌ Error durante la verificación con Odoo: {e}")
-        datos_para_guardar.update({'status': 'error', 'message': f'Error de conexión con el servidor: {e}'})
+        datos_para_guardar.update({'status': 'error', 'message': f'Error de conexión: {e}'})
         guardar_en_google_sheets(datos_para_guardar)
         return jsonify({'status': 'error', 'message': 'Error de conexión con el servidor.'})
 
