@@ -50,11 +50,11 @@ def guardar_en_google_sheets(datos_verificacion):
         
         # --- ¡CAMBIO IMPORTANTE AQUÍ! ---
         # Pega la URL completa de tu Google Sheet entre las comillas.
-        spreadsheet_url = "https://docs.google.com/spreadsheets/d/154IImDC8gsEQR1zZ499JjD9yhqsNFVARpu0yiT05O34/edit?gid=0#gid=0"
+        spreadsheet_url = "https://docs.google.com/spreadsheets/d/154IImDC8gsEQR1zZ499JjD9yhqsNFVARpu0yiT05O34/edit"
         
         # Si no pones una URL, no podrá continuar.
-        if spreadsheet_url == "https://docs.google.com/spreadsheets/d/154IImDC8gsEQR1zZ499JjD9yhqsNFVARpu0yiT05O34/edit?gid=0#gid=0":
-            print("❌ Error: https://docs.google.com/spreadsheets/d/154IImDC8gsEQR1zZ499JjD9yhqsNFVARpu0yiT05O34/edit?gid=0#gid=0 en app.py con la URL real.")
+        if spreadsheet_url == "https://docs.google.com/spreadsheets/d/154IImDC8gsEQR1zZ499JjD9yhqsNFVARpu0yiT05O34/edit":
+            print("❌ Error: https://docs.google.com/spreadsheets/d/154IImDC8gsEQR1zZ499JjD9yhqsNFVARpu0yiT05O34/edit en app.py con la URL real.")
             return
 
         spreadsheet = gc.open_by_url(spreadsheet_url)
