@@ -2,41 +2,53 @@ import os
 import xmlrpc.client
 import json
 from datetime import datetime
-import pytz  # <-- IMPORTANTE: Nueva librería para zonas horarias
+import pytz
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from dotenv import load_dotenv
 import gspread
 from google.oauth2.service_account import Credentials
 
-# Cargar variables de entorno desde el archivo .env
+# Carga variables de .env SOLO si el archivo existe (para desarrollo local)
 load_dotenv()
 
 app = Flask(__name__)
-# Configura una clave secreta para la sesión de Flask
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "una-clave-secreta-muy-segura-por-defecto")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback-secret-key")
 
-# --- Configuración de Odoo (AHORA SEGURA desde .env) ---
+# --- Configuración de Odoo ---
 URL = os.getenv("ODOO_URL")
 DB = os.getenv("ODOO_DB")
 USER = os.getenv("ODOO_USER")
 PASS = os.getenv("ODOO_PASS")
 
-# --- BASE DE DATOS DE USUARIOS (AHORA SEGURA desde .env) ---
-def cargar_usuarios_desde_env():
+# --- Carga de Usuarios ---
+def cargar_usuarios():
     users_str = os.getenv("APP_USERS", "")
+    
+    # ***** LÍNEA DE DEPURACIÓN CLAVE *****
+    # Esto aparecerá en los logs de Render para que veamos qué está leyendo.
+    print(f"DEBUG: Variable APP_USERS leída del entorno: '{users_str}'")
+    # ***********************************
+
     if not users_str:
+        print("ADVERTENCIA: La variable de entorno APP_USERS está vacía o no definida.")
         return {}
     
     user_dict = {}
     for user_pair in users_str.split(','):
         if ':' in user_pair:
             nombre, pin = user_pair.split(':', 1)
-            user_dict[nombre] = pin
+            user_dict[nombre.strip()] = pin.strip() # Usamos .strip() para limpiar espacios
+    
+    print(f"DEBUG: Usuarios cargados exitosamente: {list(user_dict.keys())}")
     return user_dict
 
-USUARIOS_PERMITIDOS = cargar_usuarios_desde_env()
-if not USUARIOS_PERMITIDOS:
-    print("⚠️ Advertencia: No se cargaron usuarios desde el archivo .env. El login no funcionará.")
+USUARIOS_PERMITIDOS = cargar_usuarios()
+
+# ... (El resto de tu código: guardar_en_google_sheets, rutas, etc. se mantiene igual que en la versión anterior) ...
+
+# (Pega aquí el resto de las funciones: guardar_en_google_sheets, login, menu, falabella, logout, verify)
+# Es importante que el resto del código no cambie para no introducir nuevos problemas.
+# A continuación pego el resto del código para que sea solo copiar y pegar.
 
 def guardar_en_google_sheets(datos_verificacion):
     """Guarda los datos en Google Sheets de forma segura."""
@@ -78,8 +90,6 @@ def guardar_en_google_sheets(datos_verificacion):
     except Exception as e:
         print(f"❌ Error guardando en Google Sheets: {type(e).__name__}({e})")
 
-# --- RUTAS DE LA APLICACIÓN ---
-
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if 'user' in session:
@@ -88,10 +98,13 @@ def login():
     if request.method == 'POST':
         user = request.form.get('user')
         pin = request.form.get('pin')
+        # Comparamos usando .strip() para evitar problemas con espacios extra
         if user in USUARIOS_PERMITIDOS and USUARIOS_PERMITIDOS[user] == pin:
             session['user'] = user
             return redirect(url_for('menu'))
         else:
+            # Mensaje de error más detallado para depuración
+            print(f"Fallo de login para usuario: '{user}'. Usuarios permitidos: {list(USUARIOS_PERMITIDOS.keys())}")
             return render_template('login.html', error="Usuario o PIN incorrecto")
     return render_template('login.html')
 
@@ -121,15 +134,13 @@ def verify():
     order_name = data.get('name')
     client_ref = data.get('client_ref')
     
-    # --- INICIO DE LA LÓGICA DE HORA MEJORADA ---
     santiago_tz = pytz.timezone("America/Santiago")
     timestamp_santiago = datetime.now(santiago_tz)
     timestamp_str = timestamp_santiago.strftime('%Y-%m-%d %H:%M:%S')
-    # --- FIN DE LA LÓGICA DE HORA MEJORADA ---
 
     datos_para_guardar = {
         'operario': session.get('user', 'Desconocido'),
-        'timestamp': timestamp_str, # <-- Usamos la hora corregida
+        'timestamp': timestamp_str,
         'order_name': order_name,
         'client_ref': client_ref
     }
