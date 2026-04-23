@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ATC | Flujo Corregido Falabella</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        .flash-success { background-color: #16a34a !important; }
+        .flash-error { background-color: #dc2626 !important; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+
+<body id="mainBody" class="bg-gradient-to-br from-slate-800 to-green-900 min-h-screen flex flex-col items-center justify-center p-3 sm:p-4">
+
+    <div id="wakeLockIndicator" class="absolute top-2 right-2 text-white/50 text-xs flex items-center gap-1 hidden">
+        <i class="fas fa-sun"></i> Pantalla Activa
+    </div>
+
+    <div class="glass w-full max-w-md p-5 sm:p-8 rounded-2xl shadow-2xl z-10">
+        <div class="text-center mb-4">
+            <div class="bg-green-600 w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg relative">
+                <i class="fas fa-barcode text-white text-xl sm:text-2xl"></i>
+                <span id="scanCountBadge" class="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow border-2 border-white">0</span>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-800">Falabella - Ripley
+            </h2>
+            
+            <div class="flex justify-center mt-3">
+                <button id="modeToggleBtn" onclick="toggleMode()" class="flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-semibold transition-all border border-green-300 hover:bg-green-200 focus:outline-none">
+                    <i class="fas fa-bolt" id="modeIcon"></i>
+                    <span id="modeText">Modo Automático</span>
+                </button>
+            </div>
+
+            <!-- INDICADOR DE LOTE SIMPLIFICADO -->
+            <div id="batchProgressBox" class="mt-4 rounded-xl p-3 hidden shadow-inner w-full transition-colors">
+                <div class="font-bold text-center whitespace-normal break-words w-full leading-relaxed" id="currentBatchText">Lote: ---</div>
+            </div>
+
+        </div>
+        
+        <div class="space-y-4">
+            <div class="relative">
+                <label class="text-xs font-semibold text-green-600 uppercase tracking-wider ml-1">1. Orden de Venta</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-hashtag text-gray-400"></i>
+                    </div>
+                    <input type="text" id="order_name" autocomplete="off" inputmode="none"
+                        class="block w-full pl-10 pr-10 py-3 border-gray-200 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all text-gray-700 text-sm sm:text-base font-bold" 
+                        placeholder="Escanee Orden...">
+                    <button onclick="clearInput('order_name')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 focus:outline-none transition-colors">
+                        <i class="fas fa-times-circle text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="relative">
+                <label class="text-xs font-semibold text-green-600 uppercase tracking-wider ml-1">2. Referencia del Cliente</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-user-tag text-gray-400"></i>
+                    </div>
+                    <input type="text" id="client_ref" autocomplete="off" inputmode="none"
+                        class="block w-full pl-10 pr-10 py-3 border-gray-200 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all text-gray-700 text-sm sm:text-base font-bold" 
+                        placeholder="Escanee Referencia...">
+                    <button onclick="clearInput('client_ref')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 focus:outline-none transition-colors">
+                        <i class="fas fa-times-circle text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button onclick="checkData()" id="verifyBtn"
+                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition duration-300 flex items-center justify-center gap-2">
+                    <span>Verificar Ahora</span>
+                    <i class="fas fa-check-circle"></i>
+                </button>
+            </div>
+            
+            <div class="bg-gray-50 rounded-xl p-3 border border-gray-100 shadow-inner">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-semibold text-gray-500 uppercase">Últimos Escaneos</span>
+                    <button onclick="resetHistory()" class="text-xs text-red-400 hover:text-red-600"><i class="fas fa-trash"></i> Limpiar</button>
+                </div>
+                <ul id="historyList" class="text-xs space-y-1 h-16 overflow-y-auto no-scrollbar text-gray-600">
+                    <li class="text-center text-gray-400 italic mt-2">No hay registros aún</li>
+                </ul>
+            </div>
+
+            <a href="/menu" class="w-full text-center text-gray-500 hover:text-white transition-colors text-sm font-medium pt-2 flex items-center justify-center gap-2">
+                <i class="fas fa-chevron-left text-xs"></i> Volver al menú
+            </a>
+        </div>
+    </div>
+
+<script>
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                document.getElementById('wakeLockIndicator').classList.remove('hidden');
+                wakeLock.addEventListener('release', () => { document.getElementById('wakeLockIndicator').classList.add('hidden'); });
+            }
+        } catch (err) {}
+    };
+    document.addEventListener('visibilitychange', () => { if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock(); });
+
+    // VARIABLES INTELIGENTES DE LOTE Y CONTEO
+    let currentBatch = localStorage.getItem('falabella_batch') || '';
+    let currentBatchTotal = parseInt(localStorage.getItem('falabella_batch_total')) || 0;
+    let scanCount = parseInt(localStorage.getItem('falabella_count')) || 0;
+    let scanHistory = localStorage.getItem('falabella_history') ? JSON.parse(localStorage.getItem('falabella_history')) : [];
+
+    function updateHistoryUI() {
+        document.getElementById('scanCountBadge').innerText = scanCount;
+        
+        // ACTUALIZACIÓN DEL INDICADOR DE LOTE SIMPLIFICADO
+        const progressBox = document.getElementById('batchProgressBox');
+        const currentBatchTextEl = document.getElementById('currentBatchText');
+
+        if (currentBatch && currentBatch !== 'Sin Batch' && currentBatch !== '[]') {
+            progressBox.classList.remove('hidden');
+            currentBatchTextEl.innerText = 'Lote: ' + currentBatch.replace(/[\[\]]/g, '');
+            
+            // Cambiar el color del banner si el lote está completo
+            if (currentBatchTotal > 0 && scanCount >= currentBatchTotal) {
+                // Estilo para lote completado (verde)
+                progressBox.className = 'mt-4 rounded-xl p-3 shadow-inner w-full transition-colors bg-green-100 border border-green-300';
+                currentBatchTextEl.className = 'font-bold text-center whitespace-normal break-words w-full leading-relaxed text-green-800';
+            } else {
+                // Estilo para lote en progreso (azul)
+                progressBox.className = 'mt-4 rounded-xl p-3 shadow-inner w-full transition-colors bg-blue-100 border border-blue-300';
+                currentBatchTextEl.className = 'font-bold text-center whitespace-normal break-words w-full leading-relaxed text-blue-800';
+            }
+        } else {
+            progressBox.classList.add('hidden');
+        }
+
+        const list = document.getElementById('historyList');
+        list.innerHTML = '';
+        if (scanHistory.length === 0) { list.innerHTML = '<li class="text-center text-gray-400 italic mt-2">No hay registros aún</li>'; return; }
+        scanHistory.forEach(item => {
+            const icon = item.status === 'success' ? '<i class="fas fa-check-circle text-green-500"></i>' : '<i class="fas fa-times-circle text-red-500"></i>';
+            list.innerHTML += `<li class="flex justify-between items-center bg-white p-1 rounded border border-gray-100">
+                <span class="truncate font-mono">${icon} ${item.order}</span>
+                <span class="text-[10px] text-gray-400">${item.time}</span></li>`;
+        });
+    }
+
+    function processSuccess(order, batch, total) {
+        const timeStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+        
+        if (batch && batch !== 'Sin Batch' && batch !== '[]') {
+            if (currentBatch !== batch) {
+                currentBatch = batch;
+                currentBatchTotal = total;
+                scanCount = 1; 
+            } else {
+                scanCount++;
+            }
+            localStorage.setItem('falabella_batch', currentBatch);
+            localStorage.setItem('falabella_batch_total', currentBatchTotal);
+        } else {
+            scanCount++;
+        }
+        
+        localStorage.setItem('falabella_count', scanCount);
+        
+        scanHistory.unshift({ order: order, status: 'success', time: timeStr });
+        if (scanHistory.length > 3) scanHistory.pop();
+        localStorage.setItem('falabella_history', JSON.stringify(scanHistory));
+        updateHistoryUI();
+    }
+
+    function processError(order) {
+        const timeStr = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+        scanHistory.unshift({ order: order, status: 'error', time: timeStr });
+        if (scanHistory.length > 3) scanHistory.pop();
+        localStorage.setItem('falabella_history', JSON.stringify(scanHistory));
+        updateHistoryUI();
+    }
+
+    function resetHistory() {
+        if(confirm("¿Seguro que quieres reiniciar el contador y limpiar el Lote actual?")) {
+            scanCount = 0; currentBatch = ''; currentBatchTotal = 0; scanHistory = [];
+            localStorage.setItem('falabella_count', 0); localStorage.setItem('falabella_batch', ''); 
+            localStorage.setItem('falabella_batch_total', 0); localStorage.setItem('falabella_history', JSON.stringify([]));
+            updateHistoryUI();
+        }
+    }
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, type, duration, volume = 0.1) {
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = type; osc.frequency.value = freq; osc.connect(gain); gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(volume, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+    
+    const bodyEl = document.getElementById('mainBody');
+    const triggerSuccess = () => { 
+        playTone(880, 'sine', 0.2, 0.1); setTimeout(() => playTone(1046, 'sine', 0.2, 0.1), 100); 
+        if (navigator.vibrate) navigator.vibrate(100); 
+        bodyEl.classList.add('flash-success'); setTimeout(() => bodyEl.classList.remove('flash-success'), 300);
+    };
+
+    const triggerError = () => { 
+        playTone(150, 'sawtooth', 0.6, 0.5); 
+        if (navigator.vibrate) navigator.vibrate([300, 100, 300]); 
+        bodyEl.classList.add('flash-error'); setTimeout(() => bodyEl.classList.remove('flash-error'), 400);
+    };
+
+    let jumpTimer, verifyTimer;
+    let isManualMode = false;
+    let isProcessing = false;
+
+    function toggleMode() {
+        isManualMode = !isManualMode;
+        const btn = document.getElementById('modeToggleBtn'), icon = document.getElementById('modeIcon'), text = document.getElementById('modeText');
+        const orderInput = document.getElementById('order_name'), refInput = document.getElementById('client_ref');
+        
+        if (isManualMode) {
+            btn.className = "flex items-center gap-2 bg-orange-100 text-orange-700 px-4 py-2 rounded-full text-sm font-semibold transition-all border border-orange-300 hover:bg-orange-200 focus:outline-none";
+            icon.className = "fas fa-keyboard"; text.innerText = 'Modo Manual';
+            orderInput.setAttribute('inputmode', 'text'); refInput.setAttribute('inputmode', 'text');
+        } else {
+            btn.className = "flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-semibold transition-all border border-green-300 hover:bg-green-200 focus:outline-none";
+            icon.className = "fas fa-bolt"; text.innerText = 'Modo Automático';
+            orderInput.setAttribute('inputmode', 'none'); refInput.setAttribute('inputmode', 'none');
+        }
+        orderInput.focus();
+    }
+
+    function clearInput(inputId) { document.getElementById(inputId).value = ''; document.getElementById(inputId).focus(); }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        requestWakeLock(); updateHistoryUI();
+        const orderInput = document.getElementById('order_name'), refInput = document.getElementById('client_ref');
+
+        orderInput.addEventListener("input", () => {
+            clearTimeout(jumpTimer);
+            if (!isManualMode && orderInput.value.trim().length > 0 && !isProcessing) {
+                jumpTimer = setTimeout(() => { if (document.activeElement === orderInput) refInput.focus(); }, 100);
+            }
+        });
+
+        refInput.addEventListener("input", () => {
+            clearTimeout(verifyTimer);
+            if (!isManualMode && orderInput.value && refInput.value && !isProcessing) {
+                verifyTimer = setTimeout(checkData, 100);
+            }
+        });
+
+        orderInput.addEventListener("keypress", (e) => { if(e.key === "Enter" && !isProcessing) refInput.focus(); });
+        refInput.addEventListener("keypress", (e) => { if(e.key === "Enter" && !isProcessing) checkData(); });
+        orderInput.focus();
+    });
+
+    async function checkData() {
+        if (isProcessing) return; 
+        clearTimeout(jumpTimer); clearTimeout(verifyTimer);
+        const nameInput = document.getElementById('order_name'), refInput = document.getElementById('client_ref');
+        const verifyBtn = document.getElementById('verifyBtn');
+
+        if (Swal.isVisible() || !nameInput.value || !refInput.value) return;
+
+        isProcessing = true; verifyBtn.disabled = true; verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validando...';
+        refInput.classList.remove('border-red-500', 'ring-2', 'ring-red-500', 'shake');
+
+        try {
+            const response = await fetch('/verify', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name: nameInput.value, client_ref: refInput.value }) });
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                triggerSuccess();
+                processSuccess(nameInput.value, result.batch, result.total);
+                Swal.fire({
+                    icon: 'success', title: '¡Válido!', text: result.message, confirmButtonColor: '#16a34a', timer: 500, showConfirmButton: false,
+                    didClose: () => { nameInput.value = ''; refInput.value = ''; nameInput.focus(); isProcessing = false; verifyBtn.disabled = false; verifyBtn.innerHTML = '<span>Verificar Ahora</span> <i class="fas fa-check-circle"></i>'; }
+                });
+            } else {
+                triggerError();
+                processError(nameInput.value);
+                refInput.classList.add('border-red-500', 'ring-2', 'ring-red-500', 'shake');
+                Swal.fire({
+                    icon: 'error', title: 'Error', text: result.message, confirmButtonColor: '#ef4444',
+                    didClose: () => { refInput.value = ''; refInput.focus(); isProcessing = false; verifyBtn.disabled = false; verifyBtn.innerHTML = '<span>Verificar Ahora</span> <i class="fas fa-check-circle"></i>'; }
+                });
+            }
+        } catch (error) {
+            triggerError();
+            Swal.fire({ 
+                icon: 'error', title: 'Error Red', confirmButtonColor: '#ef4444',
+                didClose: () => { nameInput.focus(); isProcessing = false; verifyBtn.disabled = false; verifyBtn.innerHTML = '<span>Verificar Ahora</span> <i class="fas fa-check-circle"></i>'; }
+            });
+        }
+    }
+</script>
+</body>
+</html>
