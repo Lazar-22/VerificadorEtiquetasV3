@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATC | Portal Marketplace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 min-h-screen flex flex-col items-center justify-center p-6">
+    
+    <div class="text-center mb-12">
+        <h1 class="text-4xl font-extrabold text-white mb-2">Verificador de Órdenes</h1>
+        <p class="text-slate-400">Selecciona el Marketplace para verificar órdenes</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
+        
+        <a href="/falabella" class="group bg-slate-800 p-8 rounded-2xl border border-slate-700 hover:border-green-500 transition-all hover:-translate-y-2 shadow-xl">
+            <div class="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-6 group-hover:bg-green-500 transition-colors">
+                <i class="fas fa-shopping-cart text-green-500 group-hover:text-white text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Falabella - Ripley</h3>
+            <p class="text-slate-400 text-sm">Verificador de SKU y referencias para órdenes de Falabella Marketplace.</p>
+            <div class="mt-6 text-green-500 font-semibold text-sm flex items-center gap-2">
+                Ingresar <i class="fas fa-arrow-right text-xs"></i>
+            </div>
+        </a>
+
+        <div class="opacity-50 cursor-not-allowed bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
+            <div class="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center mb-6">
+                <i class="fas fa-box text-yellow-500 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Mercado Libre</h3>
+            <p class="text-slate-400 text-sm text-gray-500 italic">Próximamente disponible...</p>
+        </div>
+
+        <div class="opacity-50 cursor-not-allowed bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
+            <div class="w-16 h-16 bg-purple-500/10 rounded-full flex items-center justify-center mb-6">
+                <i class="fas fa-store text-purple-500 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Walmart</h3>
+            <p class="text-slate-400 text-sm text-gray-500 italic">Próximamente disponible...</p>
+        </div>
+
+    </div>
+
+    <footer class="mt-16 text-slate-500 text-sm">
+        ATC Odoo Bridge v1.0 - 2026 
+    </footer>
+</body>
+</html>
